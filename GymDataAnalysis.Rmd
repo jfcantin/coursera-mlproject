@@ -10,6 +10,7 @@ rm(list=ls())
 library(dplyr)
 library(httr)
 library(data.table)
+library(ggplot2)
 ```
 
 # Submission
@@ -61,7 +62,27 @@ Consider redoing the NA cleaning by group of num_window?
 summary(as.factor(training$user_name))
 summary(as.factor(training$new_window))
 summary(as.factor(training$num_window))
+
+carlitos <- training %>% 
+  filter(user_name =="carlitos")
+View(carlitos)
+
+carlitos_A <- training %>%filter(user_name =="carlitos", classe=="A")
+carlitos_B <- training %>%filter(user_name =="carlitos", classe=="B")
+
+plotByClasse <- function(item){
+p <- ggplot(carlitos)
+p <- p + geom_point(aes_string(x="raw_timestamp_part_1", y=item)) + aes(colour=as.factor(classe))
+print(p)
+}
+
+datacols <- colnames(carlitos)[7:58]
+datacols
+plotByClasse(datacols[1])
+datacols[1]
+sapply(datacols, plotByClasse)
 ```
+
 
 
 
