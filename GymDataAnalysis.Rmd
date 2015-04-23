@@ -16,6 +16,15 @@ library(lubridate)
 library(caret)
 ```
 
+```{r setupCluster}
+library(doParallel)
+detectCores()
+mc <- 4
+cl <- makeCluster(mc)
+registerDoParallel(cl)
+```
+
+
 # Submission
 **The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. **
 
@@ -123,5 +132,62 @@ inTrain <- createDataPartition(carlitos$classe, p = 3/4)[[1]]
 carTrain <- carlitos[inTrain,]
 carTest <- carlitos[-inTrain,]
 carlitosPCA <- preProcess(carTrain %>% select(-rawtimestamp, -classe, -user_name), method="pca", thresh = .9)
-carlitosPCA
+summary(carlitosPCA)
+carlitosPcaPredict <- predict(carlitosPCA, carTrain %>% select(-rawtimestamp, -classe, -user_name))
+carlitosModel <- train(carTrain$classe ~ ., method="rf", data=carlitosPcaPredict)
+carlitosTestPCA <- predict(carlitosPCA, carTest %>% select(-rawtimestamp, -classe, -user_name))
+mod1conf <- confusionMatrix(carTest$classe, predict(carlitosModel, carlitosTestPCA))
+
+carlitosModel2 <- train(classe ~ ., method="rpart", data=carTrain[,-1])
+carlitosModel2
+confusionMatrix(carTest$classe, predict(carlitosModel2, carTest[,-1]))
+
+carlitosModel3 <- train(classe ~ ., method="rf", data=carTrain[,-1])
+carlitosModel3
+mod3conf <- confusionMatrix(carTest$classe, predict(carlitosModel3, carTest[,-1]))
+mod3conf$table
+
+mod1conf$overall
+- 
+  mod3conf$overall
+
 ```
+
+## Full Classification
+```{r fullClassification}
+
+set.seed(123)
+inTrain <- createDataPartition(training$classe, p = .8)[[1]]
+# remove timestamp
+trainset <- training[inTrain,-1]
+testset <- training[-inTrain,-1]
+
+pre <- preProcess(trainset %>% select(-classe, -user_name), method="pca")
+pre
+preTrain <- predict(pre, trainset %>% select(-classe, -user_name))
+set.seed(456)
+system.time(modFitPca <- train(trainset$classe ~ ., method="rf", data=preTrain))
+set.seed(456)
+system.time(modFit <- train(classe ~ ., method="rf", data=trainset))
+
+preTest <- predict(pre, testset %>% select(-classe, -user_name))
+
+modPcaCM <- confusionMatrix(testset$classe, predict(modFitPca, preTest))
+modCM <- confusionMatrix(testset$classe, predict(modFit, testset))
+
+```
+
+```{r createFinalPrediction}
+# Prepare TestFile
+colnames(trainset)
+finalTest <- otesting[colnames(trainset)]
+
+
+```
+
+
+```{r LastWords}
+stopCluster(cl)
+sessionInfo()
+```
+
