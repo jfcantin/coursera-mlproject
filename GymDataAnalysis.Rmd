@@ -80,11 +80,6 @@ training <- training %>%
   select(rawtimestamp, classe:magnet_forearm_z)
 
 ```
-cols <- training[,colSums(is.na(training)) < nrow(training)*0.1]
-which(cols==TRUE)
-training <- training %>% select(which(cols==TRUE))
-glimpse(training)
-summary(training)
 
 There appears to be lots of NA's so we'll remove columns with more than 90% of NA's 
 Also there appears to have been some misclassification of some columns as character instead of double
@@ -92,14 +87,25 @@ Also there appears to have been some misclassification of some columns as charac
 Consider redoing the NA cleaning by group of num_window?
 
 ```{r}
+cols <- training[colSums(is.na(training)) < nrow(training)*0.1]
+which(cols==TRUE)
+training %>% select(which(cols==TRUE))
+glimpse(training)
+summary(training)
 
 carlitos <- training %>% 
   filter(user_name =="carlitos")
 View(carlitos)
 
 carlitos_A <- training %>%filter(user_name =="carlitos", classe=="A")
+training %>% filter(user_name == "carlitos", classe=="A", new_window=="yes") %>% View
+View(carlitos_A)
+summary(training$user_name)
+carlitos_A %>% count(num_window)
 carlitos_B <- training %>%filter(user_name =="carlitos", classe=="B")
+carlitos_B %>% count(num_window)
 
+training %>% filter(user_name=="adelmo", classe=="A") %>% count(num_window)
 plotByClasse <- function(item){
 p <- ggplot(carlitos)
 p <- p + geom_point(aes_string(x="raw_timestamp_part_1", y=item)) + aes(colour=as.factor(classe))
