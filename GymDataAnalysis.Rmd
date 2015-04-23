@@ -37,13 +37,13 @@ if(file.exists(trainingFile) && file.exists(testingFile)){
 ```
 
 # Data Exploration
-```{r exploration}
+```{r exploration, warning=FALSE}
 dim(training)
 glimpse(training)
 
 colClasses <- lapply(training, class)
 colCharacter <- which(colClasses == "character")
-colCharacter <- colCharacter[4:length(colCharacter)]
+colCharacter <- colCharacter[4:length(colCharacter)-1]
 training[,(colCharacter):=lapply(.SD, as.double), .SDcols=colCharacter]
 
 cols <- training[,colSums(is.na(training)) < nrow(training)*0.1]
@@ -58,7 +58,9 @@ Also there appears to have been some misclassification of some columns as charac
 Consider redoing the NA cleaning by group of num_window?
 
 ```{r}
-
+summary(as.factor(training$user_name))
+summary(as.factor(training$new_window))
+summary(as.factor(training$num_window))
 ```
 
 
