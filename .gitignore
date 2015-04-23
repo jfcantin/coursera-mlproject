@@ -3,3 +3,4 @@
 .RData
 output
 *_cache
+*.html
