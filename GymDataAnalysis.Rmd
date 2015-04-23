@@ -9,8 +9,9 @@ output: html_document
 rm(list=ls())
 library(dplyr)
 library(httr)
-library(data.table)
+#library(data.table)
 library(ggplot2)
+library(lubridate)
 ```
 
 # Submission
@@ -36,33 +37,54 @@ Read more: http://groupware.les.inf.puc-rio.br/har#ixzz3Y9JZ39Ox
 trainingFile <- "data//training.rds"
 testingFile <- "data//testing.rds"
 if(file.exists(trainingFile) && file.exists(testingFile)){
-  training <- readRDS(trainingFile)
-  testing <- readRDS(testingFile)
+  otraining <- readRDS(trainingFile)
+  otesting <- readRDS(testingFile)
 } else{
   pmlTrainingUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
   pmlTestingUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
-  training <- tbl_dt(content(GET(pmlTrainingUrl)))
-  testing <- tbl_dt(content(GET(pmlTestingUrl)))
-  saveRDS(training, trainingFile)
-  saveRDS(testing, testingFile)
+  otraining <- tbl_df(content(GET(pmlTrainingUrl)))
+  otesting <- tbl_df(content(GET(pmlTestingUrl)))
+  saveRDS(otraining, trainingFile)
+  saveRDS(otesting, testingFile)
 }
 ```
 
 # Data Exploration
-```{r exploration, warning=FALSE}
-dim(training)
-glimpse(training)
 
-colClasses <- lapply(training, class)
-colCharacter <- which(colClasses == "character")
-colCharacter <- colCharacter[4:length(colCharacter)-1]
-training[,(colCharacter):=lapply(.SD, as.double), .SDcols=colCharacter]
+## Data Cleaning
+```{r initialDataReview, warning=FALSE}
+dim(otraining)
+glimpse(otraining)
+```
+* Lots of columns with NA and empty strings
+* Some of the `character` columns have been misclassified. They should be double.
 
+```{r columnClassification}
+# reorder columns
+training <- otraining %>% select(classe, user_name:magnet_forearm_z)
+
+# create factors
+factorCols <- c(1,2,6)
+training[factorCols] <- lapply(training[factorCols], as.factor)
+
+# create dates
+training$cvtd_timestamp <- dmy_hm(training$cvtd_timestamp)
+
+# convert char to double
+ischarCols <- sapply(training, is.character)
+training[ischarCols] <- lapply(training[ischarCols], as.double)
+
+# combine timestamps
+training <- training %>% 
+  mutate(rawtimestamp = as.double(paste(raw_timestamp_part_1, raw_timestamp_part_2, sep="."))) %>% 
+  select(rawtimestamp, classe:magnet_forearm_z)
+
+```
 cols <- training[,colSums(is.na(training)) < nrow(training)*0.1]
 which(cols==TRUE)
 training <- training %>% select(which(cols==TRUE))
 glimpse(training)
-```
+summary(training)
 
 There appears to be lots of NA's so we'll remove columns with more than 90% of NA's 
 Also there appears to have been some misclassification of some columns as character instead of double
@@ -70,9 +92,6 @@ Also there appears to have been some misclassification of some columns as charac
 Consider redoing the NA cleaning by group of num_window?
 
 ```{r}
-summary(as.factor(training$user_name))
-summary(as.factor(training$new_window))
-summary(as.factor(training$num_window))
 
 carlitos <- training %>% 
   filter(user_name =="carlitos")
