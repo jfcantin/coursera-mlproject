@@ -19,6 +19,17 @@ library(ggplot2)
 1. Your submission should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online (and you always want to make it easy on graders :-).
 2. You should also apply your machine learning algorithm to the 20 test cases available in the test data above. Please submit your predictions in appropriate format to the programming assignment for automated grading. See the programming assignment for additional details. 
 
+# Classes
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: 
+
+* exactly according to the specification (Class A) 
+* throwing the elbows to the front (Class B)
+* lifting the dumbbell only halfway (Class C)
+* lowering the dumbbell only halfway (Class D) 
+* throwing the hips to the front (Class E)
+
+Read more: http://groupware.les.inf.puc-rio.br/har#ixzz3Y9JZ39Ox
+
 # Get Data
 ```{r originalData}
 # The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har
@@ -81,6 +92,7 @@ datacols
 plotByClasse(datacols[1])
 datacols[1]
 sapply(datacols, plotByClasse)
+
 ```
 
 
