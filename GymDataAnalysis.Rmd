@@ -7,11 +7,13 @@ output: html_document
 
 ```{r initialization}
 rm(list=ls())
+library(tidyr)
 library(dplyr)
 library(httr)
 #library(data.table)
 library(ggplot2)
 library(lubridate)
+library(caret)
 ```
 
 # Submission
@@ -77,51 +79,49 @@ training[ischarCols] <- lapply(training[ischarCols], as.double)
 # combine timestamps
 training <- training %>% 
   mutate(rawtimestamp = as.double(paste(raw_timestamp_part_1, raw_timestamp_part_2, sep="."))) %>% 
-  select(rawtimestamp, classe:magnet_forearm_z)
+  select(rawtimestamp, classe, user_name, roll_belt:magnet_forearm_z)
 
 ```
 
-There appears to be lots of NA's so we'll remove columns with more than 90% of NA's 
-Also there appears to have been some misclassification of some columns as character instead of double
+There appears to be lots of NA's so we need a strategy in dealing with them. 
+After reading the paper associated with the data we can conclude that most of the variables are calculated based on their window strategy. With that in mind the only raw data we should use are the original time series since any derived / calculated features will not be present in the test dataset. :
+* all gyros,accel,magnet xyz
+* none of the kurtosis, skewness, max, min, amplitude, var, avg, stddev, 
 
-Consider redoing the NA cleaning by group of num_window?
-
-```{r}
-cols <- training[colSums(is.na(training)) < nrow(training)*0.1]
-which(cols==TRUE)
-training %>% select(which(cols==TRUE))
-glimpse(training)
-summary(training)
-
-carlitos <- training %>% 
-  filter(user_name =="carlitos")
-View(carlitos)
-
-carlitos_A <- training %>%filter(user_name =="carlitos", classe=="A")
-training %>% filter(user_name == "carlitos", classe=="A", new_window=="yes") %>% View
-View(carlitos_A)
-summary(training$user_name)
-carlitos_A %>% count(num_window)
-carlitos_B <- training %>%filter(user_name =="carlitos", classe=="B")
-carlitos_B %>% count(num_window)
-
-training %>% filter(user_name=="adelmo", classe=="A") %>% count(num_window)
-plotByClasse <- function(item){
-p <- ggplot(carlitos)
-p <- p + geom_point(aes_string(x="raw_timestamp_part_1", y=item)) + aes(colour=as.factor(classe))
-print(p)
-}
-
-datacols <- colnames(carlitos)[7:58]
-datacols
-plotByClasse(datacols[1])
-datacols[1]
-sapply(datacols, plotByClasse)
-
+```{r columnSelection}
+training <- training %>% 
+  select(-starts_with("kurtosis_"),
+         -starts_with("skewness_"),
+         -starts_with("max_"),
+         -starts_with("min_"),
+         -starts_with("amplitude_"),
+         -starts_with("var_"),
+         -starts_with("avg_"),
+         -starts_with("stddev_"))
 ```
 
 
+```{r explore}
+str(training$classe)
+p <- ggplot(training %>% filter(user_name=="carlitos", classe=="A"))
+p <- p + geom_line(aes(x=rawtimestamp, y=total_accel_dumbbell)) + aes(colour=classe)
+p <- p + facet_grid(.~classe, scales = "free_x")
+p
 
+p <- ggplot(training)# %>% filter(user_name=="carlitos"))
+p <- p + geom_line(aes(x=rawtimestamp, y=total_accel_dumbbell)) + aes(colour=classe)
+p <- p + facet_grid(classe ~ user_name, scales = "free_x")
+p
 
+```
 
-
+# Classification Preparation
+Let's start with a small subset of the data like one user to test protocol
+```{r }
+carlitos <- training %>% filter(user_name == "carlitos")
+inTrain <- createDataPartition(carlitos$classe, p = 3/4)[[1]]
+carTrain <- carlitos[inTrain,]
+carTest <- carlitos[-inTrain,]
+carlitosPCA <- preProcess(carTrain %>% select(-rawtimestamp, -classe, -user_name), method="pca", thresh = .9)
+carlitosPCA
+```
