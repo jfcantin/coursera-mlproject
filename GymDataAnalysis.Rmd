@@ -14,6 +14,7 @@ library(httr)
 library(ggplot2)
 library(lubridate)
 library(caret)
+library(rattle)
 ```
 
 ```{r setupCluster}
@@ -126,7 +127,9 @@ p
 
 # Classification Preparation
 Let's start with a small subset of the data like one user to test protocol
-```{r }
+
+### Need to try different model
+```{r sample, eval=FALSE}
 carlitos <- training %>% filter(user_name == "carlitos")
 inTrain <- createDataPartition(carlitos$classe, p = 3/4)[[1]]
 carTrain <- carlitos[inTrain,]
@@ -172,17 +175,21 @@ system.time(modFit <- train(classe ~ ., method="rf", data=trainset))
 
 preTest <- predict(pre, testset %>% select(-classe, -user_name))
 
+fancyRpartPlot(modFitPca$finalModel)
 modPcaCM <- confusionMatrix(testset$classe, predict(modFitPca, preTest))
 modCM <- confusionMatrix(testset$classe, predict(modFit, testset))
 
+modPcaCM
+modCM
+plot(modFit, log = "y", main="Model Accuracy" )
 ```
 
 ```{r createFinalPrediction}
 # Prepare TestFile
 colnames(trainset)
 finalTest <- otesting[colnames(trainset)]
-
-
+finalPrediction <- predict(modFit, finalTest)
+pml_write_files(as.character(finalPrediction))
 ```
 
 
