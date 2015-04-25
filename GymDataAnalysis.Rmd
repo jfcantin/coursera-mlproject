@@ -43,6 +43,9 @@ Six young health participants were asked to perform one set of 10 repetitions of
 
 Read more: http://groupware.les.inf.puc-rio.br/har#ixzz3Y9JZ39Ox
 
+## TODO:
+* Should I try heatmap.2?
+
 # Get Data
 ```{r originalData}
 # The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har
@@ -164,6 +167,17 @@ inTrain <- createDataPartition(training$classe, p = .8)[[1]]
 # remove timestamp
 trainset <- training[inTrain,-1]
 testset <- training[-inTrain,-1]
+
+transparentTheme(trans = 0.9)
+featurePlot(x = trainset[,3:20],
+            y = trainset$classe,
+            plot = "density",
+            scales = list(y = list(relation="free"),
+                          x = list(relation="free")),
+            adjust = 1.5,
+            pch = "|",
+            layout = c(4,5),
+            auto.key = list(columns = 5))
 
 pre <- preProcess(trainset %>% select(-classe, -user_name), method="pca")
 pre
