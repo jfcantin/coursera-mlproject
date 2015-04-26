@@ -1,8 +1,12 @@
 ---
-title: "Gym session analysis"
+title: "Unilateral Dumbbell Biceps Curl Motion Analysis"
 author: "Jean-Francois Cantin"
 date: "April 22, 2015"
-output: html_document
+output:
+  html_document:
+    fig_height: 7
+    fig_width: 10
+    toc: yes
 ---
 
 ```{r initialization, include=FALSE}
@@ -24,15 +28,8 @@ cl <- makeCluster(detectCores())
 registerDoParallel(cl)
 ```
 
-
-# Submission
-**The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. **
-
-1. Your submission should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online (and you always want to make it easy on graders :-).
-2. You should also apply your machine learning algorithm to the 20 test cases available in the test data above. Please submit your predictions in appropriate format to the programming assignment for automated grading. See the programming assignment for additional details. 
-
-# Classes
-Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: 
+# Summary
+Using the weight lifting exercise dataset from the [human activity recognition website](http://groupware.les.inf.puc-rio.br/har) we tried to predict the manner in which the subjects performed Dumbbell Biceps Curl. The training data contained motion analysis from 6 participants each performing 10 repetitions in five different fashions: 
 
 * exactly according to the specification (Class A) 
 * throwing the elbows to the front (Class B)
@@ -40,7 +37,7 @@ Six young health participants were asked to perform one set of 10 repetitions of
 * lowering the dumbbell only halfway (Class D) 
 * throwing the hips to the front (Class E)
 
-Read more: http://groupware.les.inf.puc-rio.br/public/papers/2013.Velloso.QAR-WLE.pdf
+Multiple classification models were tried and the random forest model performed the best.
 
 # Get Data
 ```{r originalData}
@@ -251,6 +248,10 @@ testConfusionMatrix$overall
 ```
 
 Using the test set we calculated an accuracy of 98.96% which translate into an out of sample error rate of 1.04%. So it seems that the model was not over fitting the data.
+
+# References
+
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
 
 ```{r validateModel, eval=FALSE, include=FALSE}
 # Prepare TestFile
