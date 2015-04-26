@@ -20,8 +20,7 @@ library(rattle)
 ```{r setupCluster}
 library(doParallel)
 detectCores()
-mc <- 4
-cl <- makeCluster(mc)
+cl <- makeCluster(detectCores())
 registerDoParallel(cl)
 ```
 
@@ -50,17 +49,17 @@ Read more: http://groupware.les.inf.puc-rio.br/har#ixzz3Y9JZ39Ox
 ```{r originalData}
 # The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har
 trainingFile <- "data//training.rds"
-testingFile <- "data//testing.rds"
-if(file.exists(trainingFile) && file.exists(testingFile)){
+validationFile <- "data//validation.rds"
+if(file.exists(trainingFile) && file.exists(validationFile)){
   otraining <- readRDS(trainingFile)
-  otesting <- readRDS(testingFile)
+  ovalidation <- readRDS(validationFile)
 } else{
   pmlTrainingUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
-  pmlTestingUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+  pmlValidationUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
   otraining <- tbl_df(content(GET(pmlTrainingUrl)))
-  otesting <- tbl_df(content(GET(pmlTestingUrl)))
+  ovalidation <- tbl_df(content(GET(pmlValidationUrl)))
   saveRDS(otraining, trainingFile)
-  saveRDS(otesting, testingFile)
+  saveRDS(ovalidation, validationFile)
 }
 ```
 
@@ -128,10 +127,7 @@ p
 
 ```
 
-# Classification Preparation
 Let's start with a small subset of the data like one user to test protocol
-
-### Need to try different model
 ```{r sample, eval=FALSE}
 carlitos <- training %>% filter(user_name == "carlitos")
 inTrain <- createDataPartition(carlitos$classe, p = 3/4)[[1]]
@@ -159,25 +155,69 @@ mod1conf$overall
 
 ```
 
-## Full Classification
-```{r fullClassification}
-
+## Create sample sets
+```{r samplesets}
 set.seed(123)
 inTrain <- createDataPartition(training$classe, p = .8)[[1]]
 # remove timestamp
 trainset <- training[inTrain,-1]
 testset <- training[-inTrain,-1]
+```
 
-transparentTheme(trans = 0.9)
-featurePlot(x = trainset[,3:20],
-            y = trainset$classe,
-            plot = "density",
-            scales = list(y = list(relation="free"),
-                          x = list(relation="free")),
-            adjust = 1.5,
-            pch = "|",
-            layout = c(4,5),
-            auto.key = list(columns = 5))
+### Need to try different model
+
+## Feature selection
+### Near Zero Variance
+```{r nzv}
+# Find near zero variance features
+nzv <- nearZeroVar(trainset, saveMetrics = TRUE)
+nzv %>% filter(nzv==TRUE)
+```
+
+### Identify Correlated Predictors
+```{r correlatedPredictors}
+correlationMatrix <- cor(trainset[,3:ncol(trainset)])
+print(correlationMatrix)
+heatmap(correlationMatrix)
+highCorrelationFeatureIdx <- findCorrelation(correlationMatrix, cutoff = 0.75) + 2
+glimpse(trainset[,highCorrelationFeatureIdx])
+
+# remove redundant features
+trainSubset <- trainset[,-highCorrelationFeatureIdx]
+testSubset <- testset[,-highCorrelationFeatureIdx]
+```
+
+## Model and Predict
+### Scale and center data
+```{r scaleCenter}
+set.seed(1)
+preProcTrainSubset <- preProcess(trainSubset %>% select(-classe, -user_name), method=c("center", "scale"))
+trainSubsetTransformed <- predict(preProcTrainSubset, trainSubset %>% select(-classe, -user_name))
+testSubsetTransformed <- predict(preProcTrainSubset, testSubset %>% select(-classe, -user_name))
+
+trainSubsetTransformed <- cbind(trainSubset[,1:2], trainSubsetTransformed)
+testSubsetTransformed <- cbind(testSubset[,1:2], testSubsetTransformed)
+```
+
+### Model with Rpart
+```{r rpart}
+
+control <- trainControl(method="repeatedcv", number=10, repeats=3)
+modelRpart <- train(classe ~ ., data=trainSubsetTransformed, method="rpart", trControl=control)
+importance <- varImp(modelRpart, scale=FALSE)
+print(importance)
+plot(importance)
+```
+### Model with boosting
+```{r boosting}
+# boosting
+modelBoosting <- train(classe ~ ., data=trainSubsetTransformed, 
+                       method="gbm", 
+                       trControl=control, 
+                       verbose = FALSE)
+importance <- varImp(modelBoosting, scale=FALSE)
+print(importance)
+plot(importance)
 
 pre <- preProcess(trainset %>% select(-classe, -user_name), method="pca")
 pre
@@ -198,12 +238,20 @@ modCM
 plot(modFit, log = "y", main="Model Accuracy" )
 ```
 
-```{r createFinalPrediction}
+## Compare models
+```{r compareModels}
+results <- resamples(list(RPART=modelRpart, GBM=modelBoosting)) #, RF_PCA=modFitPca, RF=modFit))
+summary(results)
+bwplot(results)
+dotplot(results)
+```
+# Validate Model
+```{r validateModel}
 # Prepare TestFile
 colnames(trainset)
-finalTest <- otesting[colnames(trainset)]
-finalPrediction <- predict(modFit, finalTest)
-pml_write_files(as.character(finalPrediction))
+validationSet <- otesting[colnames(trainset)]
+validationPrediction <- predict(modFit, validationSet)
+pml_write_files(as.character(validationPrediction))
 ```
 
 
