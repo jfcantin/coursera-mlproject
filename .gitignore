@@ -5,3 +5,4 @@ output
 *_cache
 *.html
 *_files
+!GymDataAnalysis.html
