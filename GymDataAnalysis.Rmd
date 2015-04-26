@@ -37,7 +37,7 @@ Using the weight lifting exercise dataset from the [human activity recognition w
 * lowering the dumbbell only halfway (Class D) 
 * throwing the hips to the front (Class E)
 
-Multiple classification models were tried and the random forest model performed the best.
+Multiple classification models (CART, Boosting, Random Forest) were tried and the random forest model with 100 trees was selected for its accuracy and its computational speed.
 
 # Get Data
 ```{r originalData}
@@ -236,18 +236,27 @@ results <- resamples( list(
 bwplot(results)
 ```
 
-We can see that the random forest models are the better performing ones. After reviewing the accuracy of the 2 random forest models it seems that increasing the number of trees above 50 did not yield any significant improvement in accuracy while it kept the computation time to a minimum. Using bootstrap cross validation better accuracy was achieved but the computation time was much higher. 
+We can see from the summary table the the CART model (using rpart) has a very low accuracy and was therefore dropped from the Accuracy / Kappa plot.
 
-The in sample estimate of error rate calculated for the final model of the random forest model with 50 trees is 1.27% which translate into a 98.73% accuracy for the classification.
+All models were run with a 10 fold cross validation.
+
+On the box plot of the Accuracy and Kappa the random forest models are far more accurate than the boosting model. The three random forest models have very close accuracy to each other although both models with 100 and 250 trees have slightly better metrics. Given that the random forest model with 100 trees was significantly faster to compute and his in sample error is very close to the model with 250 trees, therefore the random forest model with 100 trees was selected. 
+
+## In Sample Error Rate
+```{r}
+modelRF100$finalModel
+```
+The in sample estimate of error rate calculated for the final model of the random forest model with 100 trees is 0.92% which translate into a 99.08% accuracy for the classification.
 
 ## Apply model to test data
 ```{r testdata}
 set.seed(1)
-testConfusionMatrix <- confusionMatrix(testsetOutcome$classe, predict(modelRF50, testSubsetTransformed))
+testConfusionMatrix <- confusionMatrix(testsetOutcome$classe, predict(modelRF100, testSubsetTransformed))
 testConfusionMatrix$overall
 ```
 
-Using the test set we calculated an accuracy of 98.96% which translate into an out of sample error rate of 1.04%. So it seems that the model was not over fitting the data.
+## Out of Sample Error Rate
+Using the test set we calculated an accuracy of 99.08% which translate into an out of sample error rate of 0.92%. So it seems that the model was not over fitting the data since its out of sample error rate is similar to the in sample error rate.
 
 # References
 
