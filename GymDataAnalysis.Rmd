@@ -5,22 +5,20 @@ date: "April 22, 2015"
 output: html_document
 ---
 
-```{r initialization}
+```{r initialization, include=FALSE}
 rm(list=ls())
 library(stringr)
 library(tidyr)
 library(plyr)
 library(dplyr)
 library(httr)
-#library(data.table)
 library(ggplot2)
 library(lubridate)
 library(caret)
 library(randomForest)
-#library(rattle)
 ```
 
-```{r setupCluster}
+```{r setupCluster, include=FALSE}
 library(doParallel)
 cl <- makeCluster(detectCores())
 registerDoParallel(cl)
@@ -71,7 +69,7 @@ glimpse(otraining)
 ```
 We can see that there are a few columns with empty strings. It seems that the empty strings (`character`) columns are just misclassified and should be reclassified as double. Same goes for the timestamps columns that are labeled as `character`.
 
-```{r columnClassification}
+```{r columnClassification, warning=FALSE}
 # reorder columns
 training <- otraining %>% select(classe, user_name:magnet_forearm_z)
 
@@ -93,11 +91,11 @@ training <- training %>%
 
 ```
 
-There appears to be lots of NA's so we need a strategy in dealing with them. 
-After reading the [paper](http://groupware.les.inf.puc-rio.br/public/papers/2013.Velloso.QAR-WLE.pdf) associated with the data we can conclude that most of the variables with significant numbers of NA's are calculated based on the paper author's window strategy. With that in mind the only raw data we should use are the original time series since any derived / calculated features will not be present in the test dataset. 
-So we will be excluding the following:
+There appears to be lots of NA's so we need a strategy in dealing with them.
 
-* none of the kurtosis, skewness, max, min, amplitude, var, avg, stddev, 
+After reading the [paper](http://groupware.les.inf.puc-rio.br/public/papers/2013.Velloso.QAR-WLE.pdf) associated with the data we can conclude that most of the variables with significant numbers of NA's are calculated based on the paper author's window strategy. 
+With that in mind the only raw data we should use are the original time series since any derived / calculated features will not be present in the test dataset. 
+So we will be excluding the following columns (kurtosis, skewness, max, min, amplitude, var, avg, stddev)
 
 ```{r columnSelection}
 training <- training %>% 
@@ -111,7 +109,7 @@ training <- training %>%
          -starts_with("stddev_"))
 ```
 
-Now that we have removed the unnecessary columns we can have a quick look as some of the data.
+Now that we have removed the unnecessary columns we can have a quick look at some of the data.
 
 ```{r explore}
 p <- ggplot(training)
@@ -150,15 +148,16 @@ There were no features with near zero variance.
 ### Identify Correlated Predictors
 ```{r correlatedPredictors}
 correlationMatrix <- cor(trainsetPredictor)
-#print(correlationMatrix)
 heatmap(correlationMatrix)
 highCorrelationFeatureIdx <- findCorrelation(correlationMatrix, cutoff = 0.75)
-glimpse(trainsetPredictor[,highCorrelationFeatureIdx])
 
 # remove redundant features
 trainSubset <- trainsetPredictor[,-highCorrelationFeatureIdx]
 testSubset <- testsetPredictor[,-highCorrelationFeatureIdx]
+dim(trainSubset)
 ```
+After removing the highly correlated predictors we are down to 31 features. 
+We can now start the processing of these variables.
 
 ## Model and Predict
 ### Scale and center data
@@ -170,52 +169,60 @@ testSubsetTransformed <- predict(centerScaledTrainSubset, testSubset)
 ```
 
 ### Model with Rpart
-```{r rpart}
+```{r rpart, cache=TRUE, message=FALSE}
 set.seed(1)
 control <- trainControl(method="cv", number=10)
 modelRpart <- train(trainsetOutcome$classe ~ ., data=trainSubsetTransformed, method="rpart", trControl=control)
-importance <- varImp(modelRpart, scale=FALSE)
-plot(importance)
+importanceRpart <- varImp(modelRpart, scale=FALSE)
 ```
 
 ### Model with boosting
-```{r boosting}
+```{r boosting, cache=TRUE, message=FALSE}
 # boosting
 set.seed(1)
 modelBoosting <- train(trainsetOutcome$classe ~ ., data=trainSubsetTransformed, 
                        method="gbm", 
                        trControl=control, 
                        verbose = FALSE)
-importance <- varImp(modelBoosting, scale=FALSE)
-plot(importance)
+importanceBoosting <- varImp(modelBoosting, scale=FALSE)
 ```
 
 ### Model with Random Forest
-```{r randomForest}
-set.seed(1)
-modelRF250 <- train(trainsetOutcome$classe ~ .,
-                data=trainSubsetTransformed,
-                method="rf",
-                trControl=control,
-                ntree=250)
-importance <- varImp(modelRF250, scale=FALSE)
-plot(importance)
-plot(modelRF250)
-plot(modelRF250$finalModel)
-
+```{r randomForest50, cache=TRUE, message=FALSE}
 set.seed(1)
 modelRF50 <- train(trainsetOutcome$classe ~ .,
                 data=trainSubsetTransformed,
                 method="rf",
                 trControl=control,
                 ntree=50)
-
-#preTest <- predict(pre, testset %>% select(-classe, -user_name))
+importanceRF50 <- varImp(modelRF50, scale=FALSE)
+plot(importanceRF50)
+plot(modelRF50)
+plot(modelRF50$finalModel)
 ```
 
-#fancyRpartPlot(modFitPca$finalModel)
-modPcaCM <- confusionMatrix(testset$classe, predict(modFitPca, preTest))
-modCM <- confusionMatrix(testset$classe, predict(modFit, testset))
+```{r randomForest100, cache=TRUE, message=FALSE}
+set.seed(1)
+modelRF100 <- train(trainsetOutcome$classe ~ .,
+                data=trainSubsetTransformed,
+                method="rf",
+                trControl=control,
+                ntree=100)
+importanceRF100 <- varImp(modelRF100, scale=FALSE)
+```
+
+```{r randomForest250, cache=TRUE, message=FALSE}
+set.seed(1)
+# modelRF250 <- train(trainsetOutcome$classe ~ .,
+#                 data=trainSubsetTransformed,
+#                 method="rf",
+#                 trControl=control,
+#                 ntree=250)
+# importance <- varImp(modelRF250, scale=FALSE)
+# plot(importance)
+# plot(modelRF250)
+# plot(modelRF250$finalModel)
+```
 
 ## Compare models
 ```{r compareModels}
@@ -223,28 +230,36 @@ results <- resamples(
   list( 
     RPART=modelRpart,  
     GBM=modelBoosting,
-    RF_250=modelRF250,
+    RF_100=modelRF100,
+    #RF_250=modelRF250,
     RF_50=modelRF50))
 summary(results)
 bwplot(results)
 ```
 
-modPcaCM
-modCM
-plot(modFit, log = "y", main="Model Accuracy" )
+We can see that the random forest models are the better performing ones. After reviewing the accuracy of the 2 random forest models it seems that increasing the number of trees above 50 did not yield any significant improvement in accuracy while it kept the computation time to a minimum. Using bootstrap cross validation better accuracy was achieved but the computation time was much higher. 
+
+The OOB estimate of error rate calculated for the final model of the random forest model with 50 trees is 1.27% which translate into a 98.73% accuracy for the classification.
+
+## Apply model to test data
+```{r testdata}
+testConfusionMatrix <- confusionMatrix(testsetOutcome$classe, predict(modelRF50, testSubsetTransformed))
+testConfusionMatrix$overall
 ```
 
-# Validate Model
-```{r validateModel}
+Using the test set we calculated an accuracy of 98.98% which translate into an out of sample error rate of 1.02%.
+
+```{r validateModel, eval=FALSE, include=FALSE}
 # Prepare TestFile
+
 colnames(trainset)
-validationSet <- otesting[colnames(trainset)]
-validationPrediction <- predict(modFit, validationSet)
+validationSet <- otesting[colnames(trainSubsetTransformed)]
+validationPrediction <- predict(modelRF50, validationSet)
 pml_write_files(as.character(validationPrediction))
 ```
 
 
-```{r LastWords}
+```{r LastWords, include=FALSE}
 stopCluster(cl)
 sessionInfo()
 ```
