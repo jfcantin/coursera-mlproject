@@ -65,7 +65,7 @@ if(file.exists(trainingFile) && file.exists(validationFile)){
 ## Data Cleaning
 ```{r initialDataReview, warning=FALSE}
 dim(otraining)
-glimpse(otraining)
+glimpse(otraining[1:20])
 ```
 We can see that there are a few columns with empty strings. It seems that the empty strings (`character`) columns are just misclassified and should be reclassified as double. Same goes for the timestamps columns that are labeled as `character`.
 
@@ -196,9 +196,6 @@ modelRF50 <- train(trainsetOutcome$classe ~ .,
                 trControl=control,
                 ntree=50)
 importanceRF50 <- varImp(modelRF50, scale=FALSE)
-plot(importanceRF50)
-plot(modelRF50)
-plot(modelRF50$finalModel)
 ```
 
 ```{r randomForest100, cache=TRUE, message=FALSE}
@@ -213,41 +210,47 @@ importanceRF100 <- varImp(modelRF100, scale=FALSE)
 
 ```{r randomForest250, cache=TRUE, message=FALSE}
 set.seed(1)
-# modelRF250 <- train(trainsetOutcome$classe ~ .,
-#                 data=trainSubsetTransformed,
-#                 method="rf",
-#                 trControl=control,
-#                 ntree=250)
-# importance <- varImp(modelRF250, scale=FALSE)
-# plot(importance)
-# plot(modelRF250)
-# plot(modelRF250$finalModel)
+modelRF250 <- train(trainsetOutcome$classe ~ .,
+                data=trainSubsetTransformed,
+                method="rf",
+                trControl=control,
+                ntree=250)
+importanceRF250 <- varImp(modelRF250, scale=FALSE)
 ```
 
 ## Compare models
 ```{r compareModels}
+plot(modelRF250$finalModel)
+
 results <- resamples(
   list( 
     RPART=modelRpart,  
     GBM=modelBoosting,
+    RF_50=modelRF50,
     RF_100=modelRF100,
-    #RF_250=modelRF250,
-    RF_50=modelRF50))
+    RF_250=modelRF250
+    ))
 summary(results)
+
+results <- resamples( list(  
+  GBM=modelBoosting, RF_50=modelRF50,RF_100=modelRF100,
+    RF_250=modelRF250
+    ))
 bwplot(results)
 ```
 
 We can see that the random forest models are the better performing ones. After reviewing the accuracy of the 2 random forest models it seems that increasing the number of trees above 50 did not yield any significant improvement in accuracy while it kept the computation time to a minimum. Using bootstrap cross validation better accuracy was achieved but the computation time was much higher. 
 
-The OOB estimate of error rate calculated for the final model of the random forest model with 50 trees is 1.27% which translate into a 98.73% accuracy for the classification.
+The in sample estimate of error rate calculated for the final model of the random forest model with 50 trees is 1.27% which translate into a 98.73% accuracy for the classification.
 
 ## Apply model to test data
 ```{r testdata}
+set.seed(1)
 testConfusionMatrix <- confusionMatrix(testsetOutcome$classe, predict(modelRF50, testSubsetTransformed))
 testConfusionMatrix$overall
 ```
 
-Using the test set we calculated an accuracy of 98.98% which translate into an out of sample error rate of 1.02%.
+Using the test set we calculated an accuracy of 98.96% which translate into an out of sample error rate of 1.04%. So it seems that the model was not over fitting the data.
 
 ```{r validateModel, eval=FALSE, include=FALSE}
 # Prepare TestFile
